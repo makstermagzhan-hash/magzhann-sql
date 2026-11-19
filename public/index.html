@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TicketKZ — Қазақстанның Ресми Концерт Билеттері</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo" onclick="switchTab('events')">
+                <i data-lucide="ticket" class="icon-brand"></i> Ticket<span>KZ</span>
+            </div>
+            <div class="nav-links">
+                <button class="nav-btn active" id="nav-events" onclick="switchTab('events')">
+                    <i data-lucide="music"></i> Концерттер
+                </button>
+                <button class="nav-btn" id="nav-favorites" onclick="switchTab('favorites')">
+                    <i data-lucide="heart"></i> Таңдаулылар
+                </button>
+                <button class="nav-btn" onclick="document.getElementById('add-concert-modal').classList.remove('hidden')">
+                    <i data-lucide="plus-circle"></i> Концерт қосу
+                </button>
+                <button class="nav-btn profile-pill" id="nav-profile" onclick="openProfileOrAuth()">
+                    <i data-lucide="user"></i> <span id="nav-user-name">Кіру / Профиль</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <section id="section-events">
+        <header class="hero">
+            <h1>Қазақстанның үздік концерттері</h1>
+            <p>12 ірі қаланың ең үлкен стадиондары мен ареналардағы шоуларға ресми билеттер</p>
+            
+            <div class="filter-bar">
+                <div class="city-tabs">
+                    <button class="city-btn active" onclick="filterCity('Барлығы', this)">Барлық қалалар</button>
+                    <button class="city-btn" onclick="filterCity('Алматы', this)">Алматы</button>
+                    <button class="city-btn" onclick="filterCity('Астана', this)">Астана</button>
+                    <button class="city-btn" onclick="filterCity('Шымкент', this)">Шымкент</button>
+                    <button class="city-btn" onclick="filterCity('Қарағанды', this)">Қарағанды</button>
+                    <button class="city-btn" onclick="filterCity('Ақтөбе', this)">Ақтөбе</button>
+                    <button class="city-btn" onclick="filterCity('Атырау', this)">Атырау</button>
+                    <button class="city-btn" onclick="filterCity('Ақтау', this)">Ақтау</button>
+                    <button class="city-btn" onclick="filterCity('Өскемен', this)">Өскемен</button>
+                    <button class="city-btn" onclick="filterCity('Павлодар', this)">Павлодар</button>
+                    <button class="city-btn" onclick="filterCity('Тараз', this)">Тараз</button>
+                    <button class="city-btn" onclick="filterCity('Қостанай', this)">Қостанай</button>
+                    <button class="city-btn" onclick="filterCity('Түркістан', this)">Түркістан</button>
+                </div>
+
+                <div class="search-wrap">
+                    <i data-lucide="search" class="search-icon"></i>
+                    <input type="text" id="search-input" placeholder="Әртіс, концерт немесе стадион іздеу..." oninput="loadConcerts()">
+                </div>
+
+                <!-- API АРҚЫЛЫ ӘРТІС КОНЦЕРТТЕРІН АВТОМАТТЫ ЖҮКТЕУ -->
+                <div class="api-sync-bar">
+                    <input type="text" id="api-artist-input" placeholder="API-ден әртіс турларын жүктеу (мыс: Coldplay, Ninety One, Sadraddin)...">
+                    <button type="button" id="sync-api-btn" onclick="syncRealConcertsFromAPI()">
+                        <i data-lucide="globe"></i> API Билеттер Қосу
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="container">
+            <div id="concerts-grid" class="grid"></div>
+        </main>
+    </section>
+
+    <section id="section-profile" class="hidden">
+        <div class="container">
+            <div class="profile-header-card">
+                <div class="profile-info">
+                    <div class="avatar-circle" id="prof-avatar">М</div>
+                    <div>
+                        <h2 id="prof-name">Пайдаланушы</h2>
+                        <p id="prof-meta">email@mail.kz • Алматы</p>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="logoutUser()">
+                    <i data-lucide="log-out"></i> Шығу
+                </button>
+            </div>
+
+            <h3 class="section-title"><i data-lucide="bar-chart-3"></i> Менің аналитикам</h3>
+            <div class="analytics-grid">
+                <div class="stat-card">
+                    <span class="stat-label"><i data-lucide="wallet"></i> Жалпы жұмсалған сома</span>
+                    <strong class="stat-value accent" id="stat-spent">0 ₸</strong>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label"><i data-lucide="ticket"></i> Сатып алынған билеттер</span>
+                    <strong class="stat-value" id="stat-tickets">0 дана</strong>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label"><i data-lucide="calendar-check"></i> Барған іс-шаралар</span>
+                    <strong class="stat-value" id="stat-events">0 концерт</strong>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label"><i data-lucide="map-pin"></i> Белсенді қала</span>
+                    <strong class="stat-value" id="stat-city">—</strong>
+                </div>
+            </div>
+
+            <h3 class="section-title"><i data-lucide="qr-code"></i> Менің электронды билеттерім (Тарих)</h3>
+            <div id="my-tickets-list" class="tickets-list"></div>
+        </div>
+    </section>
+
+    <!-- МОДАЛЬ 1: ПРОФИЛЬГЕ КІРУ / ТІРКЕЛУ -->
+    <div id="auth-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('auth-modal')">&times;</span>
+            <h2><i data-lucide="user-check"></i> Жеке кабинетке кіру</h2>
+            <p class="modal-sub">Билеттер тарихын, QR-кодты және шығындар аналитикасын көру үшін деректеріңізді енгізіңіз</p>
+            <form id="auth-form">
+                <label>Аты-жөніңіз:</label>
+                <input type="text" id="auth-name" placeholder="Мысалы: Абилкайдар Мағжан" required>
+                <label>Электрондық пошта (Email):</label>
+                <input type="email" id="auth-email" placeholder="magzhan@example.com" required>
+                <label>Телефон нөмірі:</label>
+                <input type="text" id="auth-phone" placeholder="+7 (707) 123-45-67">
+                <label>Қалаңыз:</label>
+                <select id="auth-city">
+                    <option value="Алматы">Алматы</option>
+                    <option value="Астана">Астана</option>
+                    <option value="Шымкент">Шымкент</option>
+                    <option value="Қарағанды">Қарағанды</option>
+                    <option value="Ақтөбе">Ақтөбе</option>
+                    <option value="Атырау">Атырау</option>
+                    <option value="Ақтау">Ақтау</option>
+                    <option value="Өскемен">Өскемен</option>
+                    <option value="Павлодар">Павлодар</option>
+                    <option value="Тараз">Тараз</option>
+                    <option value="Қостанай">Қостанай</option>
+                    <option value="Түркістан">Түркістан</option>
+                </select>
+                <button type="submit" class="submit-btn" style="margin-top: 16px;">Профильге өту</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬ 2: НАҚТЫ СТАДИОН / АРЕНА / САРАЙ СХЕМАСЫ -->
+    <div id="booking-modal" class="modal hidden">
+        <div class="modal-content hall-modal">
+            <div class="hall-header">
+                <div>
+                    <h2 id="modal-title">Концерт залы</h2>
+                    <p id="modal-venue-info" class="modal-sub"></p>
+                </div>
+                <span class="close-btn" onclick="closeModal('booking-modal')">&times;</span>
+            </div>
+
+            <div class="price-legend" id="price-legend"></div>
+
+            <div class="hall-viewport">
+                <div class="zoom-controls">
+                    <button type="button" onclick="zoomHall(0.15)"><i data-lucide="plus"></i></button>
+                    <button type="button" onclick="zoomHall(-0.15)"><i data-lucide="minus"></i></button>
+                </div>
+
+                <div id="hall-canvas" class="hall-canvas"></div>
+            </div>
+
+            <div class="selected-cart">
+                <div id="selected-seats-chips" class="chips-wrap">
+                    <span style="color:#94a3b8; font-size:0.9rem;">Схемадан бос орындарды басып таңдаңыз...</span>
+                </div>
+                <div class="cart-footer">
+                    <div>Таңдалды: <strong id="cart-count">0</strong> билет • Жалпы: <strong id="total-price" style="color:#16a34a; font-size:1.2rem;">0</strong> <strong>₸</strong></div>
+                    <button type="button" class="submit-btn cart-buy-btn" onclick="confirmSeatBooking()">Сатып алу</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬ 3: БАНКТІК КАРТАМЕН ТӨЛЕУ ТЕРЕЗЕСІ -->
+    <div id="payment-modal" class="modal hidden">
+        <div class="modal-content payment-modal">
+            <span class="close-btn" onclick="closeModal('payment-modal')">&times;</span>
+            <h2><i data-lucide="credit-card"></i> Картамен төлеу</h2>
+            <p class="modal-sub">Қауіпсіз онлайн төлем (Visa / Mastercard / Kaspi Gold)</p>
+
+            <div class="credit-card-preview">
+                <div class="card-top-row">
+                    <span class="card-chip"></span>
+                    <span class="card-brand" id="card-brand-label">VISA / KASPI</span>
+                </div>
+                <div class="card-number-display" id="card-num-preview">•••• •••• •••• ••••</div>
+                <div class="card-bottom-row">
+                    <div>
+                        <small>КАРТА ИЕСІ</small>
+                        <div id="card-holder-preview">MAGZHAN ABILKAIDAR</div>
+                    </div>
+                    <div>
+                        <small>МЕРЗІМІ</small>
+                        <div id="card-exp-preview">MM/YY</div>
+                    </div>
+                </div>
+            </div>
+
+            <form id="payment-form">
+                <label>Карта нөмірі (16 сан):</label>
+                <input type="text" id="pay-card-num" maxlength="19" placeholder="4400 4301 1234 5678" oninput="formatCardNumber(this)" required>
+
+                <label>Карта иесінің аты-жөні (латынша):</label>
+                <input type="text" id="pay-card-holder" placeholder="MAGZHAN ABILKAIDAR" oninput="document.getElementById('card-holder-preview').textContent = this.value.toUpperCase() || 'CARD HOLDER'" required>
+
+                <div class="two-cols">
+                    <div>
+                        <label>Жарамдылық мерзімі:</label>
+                        <input type="text" id="pay-card-exp" maxlength="5" placeholder="09/29" oninput="formatCardExp(this)" required>
+                    </div>
+                    <div>
+                        <label>CVV / CVC код:</label>
+                        <input type="password" id="pay-card-cvv" maxlength="3" placeholder="•••" required>
+                    </div>
+                </div>
+
+                <div class="total-box" style="text-align:center; margin-top: 16px;">
+                    Төленетін сома: <strong id="pay-modal-amount" style="color:#22c55e; font-size:1.3rem;">0</strong> <strong>₸</strong>
+                </div>
+
+                <button type="submit" id="pay-submit-btn" class="submit-btn">
+                    <i data-lucide="lock"></i> Төлемді растау
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬ 4: API АРҚЫЛЫ КНИЖНЫЙ ФОТО ТАҢДАУ -->
+    <div id="photo-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 520px;">
+            <span class="close-btn" onclick="closeModal('photo-modal')">&times;</span>
+            <h2><i data-lucide="image"></i> API арқылы фото таңдау</h2>
+            <p id="photo-modal-subtitle" class="modal-sub"></p>
+
+            <label>iTunes API арқылы әртіс фотосын іздеу:</label>
+            <div style="display:flex; gap:8px; margin-top:6px;">
+                <input type="text" id="itunes-search-query" placeholder="Әртіс аты (мыс: Қайрат Нұртас, Sadraddin)..." style="margin-top:0;">
+                <button type="button" onclick="searchArtistImagesAPI()" style="background:#38bdf8; color:#0f172a; border:none; padding:0 16px; border-radius:8px; font-weight:700; cursor:pointer;">Іздеу</button>
+            </div>
+            <div id="api-photos-grid" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-top:10px;"></div>
+
+            <div style="margin-top: 14px;">
+                <button type="button" onclick="setRandomConcertApiUrl()" style="width:100%; background:#1e293b; border:1px solid #38bdf8; color:#38bdf8; padding:9px; border-radius:8px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <i data-lucide="shuffle"></i> Концерт API-ден кездейсоқ книжный фото алу
+                </button>
+            </div>
+
+            <form id="photo-url-form" style="margin-top: 12px;">
+                <label>Таңдалған API сурет сілтемесі (URL):</label>
+                <input type="url" id="new-photo-url" placeholder="https://..." oninput="previewNewPhoto(this.value)" required>
+                
+                <div id="photo-preview-box" class="hidden" style="margin-top: 12px; text-align: center;">
+                    <img id="photo-preview-img" src="" alt="Алдын ала қарау" style="width: 180px; height: 240px; object-fit: cover; object-position: top center; border-radius: 10px; border: 1px solid #334155;">
+                </div>
+
+                <button type="submit" class="submit-btn" style="margin-top: 14px;">Базаға сақтау</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬ 5: ШЫНАЙЫ КОНЦЕРТ ҚОСУ -->
+    <div id="add-concert-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('add-concert-modal')">&times;</span>
+            <h2><i data-lucide="plus-circle"></i> Жаңа шынайы концерт қосу</h2>
+            <form id="add-concert-form">
+                <label>Әртіс / Топ аты:</label>
+                <input type="text" id="new-c-artist" placeholder="Мысалы: MOLDANAZAR" required>
+                <label>Концерт атауы:</label>
+                <input type="text" id="new-c-title" placeholder="Мысалы: Жеке концерт (КАЗ)" required>
+                <div class="two-cols">
+                    <div>
+                        <label>Қала:</label>
+                        <select id="new-c-city">
+                            <option value="Алматы">Алматы</option>
+                            <option value="Астана">Астана</option>
+                            <option value="Шымкент">Шымкент</option>
+                            <option value="Қарағанды">Қарағанды</option>
+                            <option value="Ақтөбе">Ақтөбе</option>
+                            <option value="Атырау">Атырау</option>
+                            <option value="Ақтау">Ақтау</option>
+                            <option value="Өскемен">Өскемен</option>
+                            <option value="Павлодар">Павлодар</option>
+                            <option value="Тараз">Тараз</option>
+                            <option value="Қостанай">Қостанай</option>
+                            <option value="Түркістан">Түркістан</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Күні мен уақыты:</label>
+                        <input type="datetime-local" id="new-c-date" value="2026-11-28T20:00" required>
+                    </div>
+                </div>
+                <label>Өтетін орны (Стадион / Сарай және мекенжайы):</label>
+                <input type="text" id="new-c-venue" placeholder="Орталық Стадион (Абай даңғылы, 48)" required>
+                <div class="two-cols">
+                    <div>
+                        <label>Жоғарғы трибуна / Балкон (₸):</label>
+                        <input type="number" id="new-c-bal" value="10700" required>
+                    </div>
+                    <div>
+                        <label>Фан-зона / Трибуна (₸):</label>
+                        <input type="number" id="new-c-fan" value="18000" required>
+                    </div>
+                </div>
+                <label>VIP бағасы (₸):</label>
+                <input type="number" id="new-c-vip" value="32000" required>
+                <label>Сурет URL (бос қалдырсаңыз API өзі табады):</label>
+                <input type="url" id="new-c-img" placeholder="https://...">
+                <button type="submit" class="submit-btn" style="margin-top: 14px;">Сайтқа жариялау</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

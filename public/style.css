@@ -1,0 +1,163 @@
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+body { background: #0b1120; color: #f8fafc; }
+.hidden { display: none !important; }
+
+.lucide { width: 17px; height: 17px; vertical-align: middle; flex-shrink: 0; }
+.icon-brand { width: 26px; height: 26px; color: #38bdf8; }
+
+/* Навигация */
+.navbar { background: #111827; border-bottom: 1px solid #1f2937; position: sticky; top: 0; z-index: 50; }
+.nav-container { max-width: 1200px; margin: 0 auto; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 1.6rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.logo span { color: #38bdf8; }
+.nav-links { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.nav-btn { background: transparent; border: 1px solid transparent; color: #cbd5e1; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+.nav-btn:hover, .nav-btn.active { background: #1e293b; color: #38bdf8; }
+.profile-pill { background: #1e293b; border-color: #334155; color: #fff; }
+
+/* Hero & Сүзгілер */
+.hero { text-align: center; padding: 40px 20px; background: linear-gradient(180deg, #172554 0%, #0b1120 100%); }
+.hero h1 { font-size: 2.2rem; margin-bottom: 8px; }
+.hero p { color: #94a3b8; margin-bottom: 24px; }
+.filter-bar { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.city-tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.city-btn { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 9px 16px; border-radius: 20px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+.city-btn:hover { border-color: #38bdf8; }
+.city-btn.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
+
+.search-wrap { position: relative; width: 100%; max-width: 600px; }
+.search-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #64748b; }
+#search-input { width: 100%; padding: 11px 18px 11px 42px; border-radius: 20px; border: 1px solid #334155; background: #0f172a; color: #fff; outline: none; }
+
+.api-sync-bar { width: 100%; max-width: 600px; display: flex; gap: 8px; }
+.api-sync-bar input { flex: 1; padding: 10px 16px; border-radius: 20px; border: 1px solid #38bdf8; background: #0f172a; color: #fff; outline: none; }
+.api-sync-bar button { background: #22c55e; color: #052e16; border: none; padding: 10px 18px; border-radius: 20px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+
+/* Концерт карточкалары (КНИЖНЫЙ ФОРМАТ СУРЕТТЕР) */
+.container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+.card { background: #1e293b; border-radius: 16px; overflow: hidden; border: 1px solid #334155; display: flex; flex-direction: column; position: relative; transition: 0.25s; }
+.card:hover { transform: translateY(-4px); border-color: #38bdf8; }
+.card-img-wrap { position: relative; background: #0f172a; }
+.card img {
+    width: 100%;
+    height: 380px;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+}
+.badge-type { position: absolute; top: 12px; left: 12px; background: rgba(15, 23, 42, 0.85); color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; }
+.icon-action-btn { position: absolute; top: 12px; right: 12px; background: rgba(15, 23, 42, 0.85); color: #f8fafc; border: 1px solid rgba(255,255,255,0.12); border-radius: 50%; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+.icon-action-btn:hover { background: #38bdf8; color: #0f172a; }
+.icon-action-btn.fav-active { color: #f43f5e; }
+
+.card-body { padding: 18px; flex: 1; display: flex; flex-direction: column; }
+.card h3 { font-size: 1.25rem; margin-bottom: 4px; }
+.artist { color: #38bdf8; font-weight: 700; margin-bottom: 8px; }
+.guests-box { background: #0f172a; padding: 8px 10px; border-radius: 8px; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 12px; border-left: 3px solid #f59e0b; display: flex; align-items: center; gap: 6px; }
+.info { font-size: 0.88rem; color: #94a3b8; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.info .lucide { color: #38bdf8; width: 15px; height: 15px; }
+.card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 14px; border-top: 1px solid #334155; }
+.price-range { font-size: 1.05rem; font-weight: 700; color: #f8fafc; }
+.price-range small { display: block; font-size: 0.75rem; color: #94a3b8; font-weight: 400; }
+.buy-btn { background: #38bdf8; color: #0f172a; border: none; padding: 10px 18px; border-radius: 10px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.buy-btn:hover { background: #0ea5e9; }
+
+/* Модаль терезелер */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 100; padding: 16px; }
+.modal-content { background: #1e293b; padding: 26px; border-radius: 16px; width: 100%; max-width: 440px; position: relative; max-height: 94vh; overflow-y: auto; border: 1px solid #334155; }
+.modal-content h2 { display: flex; align-items: center; gap: 8px; }
+.close-btn { position: absolute; right: 18px; top: 14px; font-size: 1.6rem; cursor: pointer; color: #94a3b8; }
+.modal-sub { color: #94a3b8; font-size: 0.9rem; margin: 6px 0 16px; }
+form label { display: block; margin-top: 12px; font-size: 0.88rem; color: #cbd5e1; }
+form input, form select { width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #fff; }
+.two-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.total-box { margin: 16px 0; padding: 12px; background: #0f172a; border-radius: 10px; font-size: 1rem; line-height: 1.6; }
+.submit-btn { width: 100%; background: #22c55e; color: #052e16; border: none; padding: 12px; border-radius: 10px; font-weight: 800; font-size: 1rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+
+/* Стадион / Арена / Концерт Сарайы Схемалары */
+.hall-modal { max-width: 980px; width: 96%; background: #f8fafc; color: #0f172a; padding: 20px; }
+.hall-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+.hall-header h2 { color: #0f172a; font-size: 1.3rem; }
+.hall-header .modal-sub { color: #64748b; margin: 2px 0 0; }
+.hall-header .close-btn { position: static; color: #334155; }
+
+.price-legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 0; justify-content: center; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600; background: #fff; padding: 5px 12px; border-radius: 20px; border: 1px solid #e2e8f0; color: #0f172a; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+
+.hall-viewport { position: relative; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; height: 450px; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 20px; }
+.zoom-controls { position: sticky; top: 10px; left: 100%; display: flex; flex-direction: column; gap: 6px; z-index: 10; }
+.zoom-controls button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.08); color: #0f172a; display: flex; align-items: center; justify-content: center; }
+
+.hall-canvas { transform-origin: top center; transition: transform 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 760px; }
+.venue-arch-banner { background: #0f172a; color: #38bdf8; padding: 6px 20px; border-radius: 20px; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.5px; }
+.hall-stage { width: 440px; background: #1e293b; color: #f8fafc; text-align: center; padding: 10px; border-radius: 0 0 28px 28px; font-weight: 800; font-size: 0.85rem; letter-spacing: 2px; box-shadow: 0 4px 12px rgba(15,23,42,0.15); }
+
+.stadium-bowl { border: 3px dashed #cbd5e1; border-radius: 48px; padding: 20px; background: #f8fafc; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.stadium-field-box { background: #ecfdf5; border: 2px solid #6ee7b7; border-radius: 20px; padding: 14px; }
+
+.hall-upper-row { display: flex; align-items: center; gap: 20px; }
+.hall-sector { background: #f1f5f9; padding: 12px 14px; border-radius: 12px; text-align: center; border: 1px solid #e2e8f0; }
+.wide-sector { width: 660px; }
+.sector-label { font-size: 0.75rem; font-weight: 800; color: #475569; margin-bottom: 8px; text-transform: uppercase; }
+
+.seats-block { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+.seat-row { display: flex; align-items: center; gap: 4px; }
+.row-num { font-size: 0.65rem; color: #94a3b8; width: 14px; text-align: right; margin-right: 3px; }
+
+.seat-dot { width: 13px; height: 13px; border-radius: 50%; border: none; cursor: pointer; transition: transform 0.15s; position: relative; }
+.seat-dot:hover:not(.booked) { transform: scale(1.35); z-index: 5; }
+.seat-dot.booked { background: #cbd5e1 !important; cursor: not-allowed; }
+.seat-dot.selected { background: #16a34a !important; box-shadow: 0 0 0 3px #bbf7d0; transform: scale(1.25); }
+
+/* Таңдалған билеттер себеті */
+.selected-cart { margin-top: 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; color: #0f172a; }
+.chips-wrap { display: flex; flex-wrap: wrap; gap: 8px; min-height: 32px; margin-bottom: 12px; }
+.seat-chip { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 4px 10px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.seat-chip button { background: none; border: none; color: #ef4444; font-weight: 800; cursor: pointer; }
+.cart-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+.cart-buy-btn { width: auto; padding: 10px 26px; }
+
+/* Банктік картамен төлеу терезесі */
+.payment-modal { max-width: 430px; }
+.credit-card-preview {
+    background: linear-gradient(135deg, #0284c7 0%, #1e3a8a 60%, #0f172a 100%);
+    border-radius: 16px;
+    padding: 20px;
+    color: #fff;
+    margin-bottom: 16px;
+    box-shadow: 0 10px 25px rgba(2, 132, 199, 0.35);
+    border: 1px solid rgba(255,255,255,0.15);
+}
+.card-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+.card-chip { width: 38px; height: 26px; background: linear-gradient(135deg, #fde047, #ca8a04); border-radius: 5px; display: inline-block; }
+.card-brand { font-weight: 800; font-size: 0.9rem; letter-spacing: 1px; color: #e0f2fe; }
+.card-number-display { font-family: monospace; font-size: 1.3rem; letter-spacing: 2px; margin-bottom: 20px; }
+.card-bottom-row { display: flex; justify-content: space-between; font-size: 0.85rem; }
+.card-bottom-row small { display: block; font-size: 0.65rem; color: #bae6fd; margin-bottom: 2px; }
+
+/* Профиль және Аналитика */
+.profile-header-card { background: #1e293b; padding: 22px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #334155; margin-bottom: 24px; }
+.profile-info { display: flex; gap: 16px; align-items: center; }
+.avatar-circle { width: 56px; height: 56px; border-radius: 50%; background: #38bdf8; color: #0f172a; font-size: 1.5rem; font-weight: 800; display: flex; justify-content: center; align-items: center; }
+.logout-btn { background: #ef4444; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.section-title { margin: 24px 0 14px; font-size: 1.25rem; display: flex; align-items: center; gap: 8px; }
+.section-title .lucide { color: #38bdf8; width: 22px; height: 22px; }
+.analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.stat-card { background: #1e293b; padding: 18px; border-radius: 14px; border: 1px solid #334155; }
+.stat-label { display: flex; align-items: center; gap: 6px; color: #94a3b8; font-size: 0.85rem; margin-bottom: 6px; }
+.stat-value { font-size: 1.5rem; }
+.stat-value.accent { color: #22c55e; }
+
+/* Электронды билет карточкасы */
+.tickets-list { display: grid; gap: 18px; }
+.ticket-item { background: #1e293b; border-radius: 16px; border: 1px solid #334155; display: grid; grid-template-columns: 1fr 240px; overflow: hidden; }
+.ticket-left { padding: 20px; border-right: 2px dashed #475569; }
+.ticket-code-badge { background: #0f172a; color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-weight: 700; display: inline-block; margin-bottom: 8px; }
+.ticket-right { background: #ffffff; color: #0f172a; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.cancel-ticket-btn { margin-top: 12px; background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 5px; }
+@media (max-width: 720px) {
+    .ticket-item { grid-template-columns: 1fr; }
+    .ticket-left { border-right: none; border-bottom: 2px dashed #475569; }
+}
