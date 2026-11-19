@@ -43,103 +43,114 @@ app.get('/api/concerts', async (req, res) => {
     }
 });
 
-// 2. Ашық API арқылы шынайы концерттерді жүктеп, базаға қосу
+// 2. Ашық API-лер (OpenStreetMap + iTunes + BandsInTown) арқылы 12 қалаға 2 концерттен автоматты жүктеу (дубликатсыз)
 app.post('/api/sync-real-concerts', async (req, res) => {
     const { artistQuery } = req.body;
     const searchArtist = (artistQuery || 'Coldplay').trim();
 
     try {
-        const itunesRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchArtist)}&country=kz&media=music&limit=5`);
+        const itunesRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchArtist)}&country=kz&media=music&limit=6`);
         const itunesData = await itunesRes.json();
-        const artistImg = itunesData.results?.[0]?.artworkUrl100?.replace('100x100bb', '600x800bb')
-            || 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&w=600&h=800&q=80';
-        const officialArtistName = itunesData.results?.[0]?.artistName || searchArtist;
-
-        const bitUrl = `https://rest.bandsintown.com/artists/${encodeURIComponent(officialArtistName)}/events?app_id=ticketkz_app`;
-        const bitRes = await fetch(bitUrl);
-        let events = [];
-        if (bitRes.ok) {
-            const rawEvents = await bitRes.json();
-            if (Array.isArray(rawEvents)) events = rawEvents.slice(0, 6);
+        const items = itunesData.results || [];
+        if (items.length === 0) {
+            return res.status(404).json({ error: `"${searchArtist}" бойынша iTunes API-ден дерек табылмады!` });
         }
 
-        const kzArenas = [
-            { city: 'Алматы', venue: 'Алматы Арена (Нұркент шағын ауданы, 7)' },
-            { city: 'Астана', venue: 'Астана Арена (Тұран даңғылы, 48)' },
-            { city: 'Шымкент', venue: 'Орталық Стадион (Қажымұқан көшесі, 1)' },
-            { city: 'Қарағанды', venue: 'Қарағанды Арена (Республика даңғылы, 13)' },
-            { city: 'Ақтау', venue: 'Ақтау Амфитеатры (Теңіз жағалауы)' },
-            { city: 'Атырау', venue: 'Мұнайшы Стадионы (Сәтбаев даңғылы, 15)' }
-        ];
-        const insertedConcerts = [];
+        const artistImg = items[0].artworkUrl100.replace('100x100bb', '600x800bb');
+        const officialArtistName = items[0].artistName || searchArtist;
 
-        if (events.length > 0) {
-            for (let i = 0; i < events.length; i++) {
-                const ev = events[i];
-                const arena = kzArenas[i % kzArenas.length];
-                const realVenue = ev.venue?.name ? `${ev.venue.name} — ${arena.venue}` : arena.venue;
-                const eventDate = ev.datetime || new Date(Date.now() + (i + 7) * 86400000).toISOString();
-                const lineup = (ev.lineup && ev.lineup.length > 1) ? ev.lineup.slice(1).join(', ') : 'Арнайы қонақтар (Live Band)';
-                const basePrice = 10000 + (i * 1500);
+        const targetCities = [
+            'Алматы', 'Астана', 'Шымкент', 'Қарағанды', 'Ақтөбе', 'Атырау',
+            'Ақтау', 'Өскемен', 'Павлодар', 'Тараз', 'Қостанай', 'Түркістан'
+        ];
+
+        const dynamicVenues = [];
+        for (const city of targetCities) {
+            try {
+                const osmUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city + ' арена стадион')}&format=json&limit=1&accept-language=kk`;
+                const osmRes = await fetch(osmUrl, {
+                    headers: { 'User-Agent': 'TicketKZ-Platform/1.0' }
+                });
+                const osmData = await osmRes.json();
+
+                if (Array.isArray(osmData) && osmData.length > 0) {
+                    const parts = osmData[0].display_name.split(',').map(s => s.trim());
+                    const venueTitle = parts[0];
+                    const streetInfo = parts.slice(1, 3).join(', ');
+                    dynamicVenues.push({
+                        city,
+                        venue: `${venueTitle} (${streetInfo})`.substring(0, 145)
+                    });
+                } else {
+                    dynamicVenues.push({ city, venue: `${city} Орталық Аренасы` });
+                }
+            } catch (_) {
+                dynamicVenues.push({ city, venue: `${city} Орталық Аренасы` });
+            }
+        }
+
+        let bitEvents = [];
+        try {
+            const bitUrl = `https://rest.bandsintown.com/artists/${encodeURIComponent(officialArtistName)}/events?app_id=ticketkz_app`;
+            const bitRes = await fetch(bitUrl);
+            if (bitRes.ok) {
+                const rawEvents = await bitRes.json();
+                if (Array.isArray(rawEvents)) bitEvents = rawEvents;
+            }
+        } catch (_) {}
+
+        const insertedConcerts = [];
+        let counter = 0;
+
+        for (const place of dynamicVenues) {
+            for (let k = 0; k < 2; k++) {
+                const trackItem = items[counter % items.length];
+                const cover = trackItem.artworkUrl100.replace('100x100bb', '600x800bb') || artistImg;
+                const bitEv = bitEvents[counter % (bitEvents.length || 1)];
+
+                const tourTitle = (bitEv?.title
+                    ? `${bitEv.title} — ${place.city}`
+                    : `${trackItem.collectionName || trackItem.trackName || 'Live Show'} (${k === 0 ? 'Кешкі шоу' : 'Қосымша концерт'})`).substring(0, 145);
+
+                // Дубликат тексеру
+                const dupCheck = await pool.query(
+                    'SELECT id FROM concerts WHERE artist = $1 AND title = $2 AND city = $3',
+                    [officialArtistName.substring(0, 95), tourTitle, place.city]
+                );
+                if (dupCheck.rows.length > 0) {
+                    counter++;
+                    continue;
+                }
+
+                const eventDate = new Date(Date.now() + (counter + 5) * 86400000).toISOString();
+                const basePrice = 8500 + (k * 2000);
 
                 const insertRes = await pool.query(
                     `INSERT INTO concerts (title, artist, concert_type, special_guests, city, venue, event_date, price_balcony, price_fanzone, price_vip, available_seats, image_url)
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 260, $11) RETURNING *`,
                     [
-                        (ev.title || `${officialArtistName} World Tour`).substring(0, 140),
+                        tourTitle,
                         officialArtistName.substring(0, 95),
                         'API Тур',
-                        lineup,
-                        arena.city,
-                        realVenue.substring(0, 145),
+                        `Жанр: ${trackItem.primaryGenreName || 'Pop / Live'} • Арнайы қонақтар`,
+                        place.city,
+                        place.venue,
                         eventDate,
                         basePrice,
                         Math.round(basePrice * 1.8),
                         Math.round(basePrice * 3.2),
-                        artistImg
-                    ]
-                );
-                insertedConcerts.push(insertRes.rows[0]);
-            }
-        } else {
-            const items = itunesData.results || [];
-            if (items.length === 0) {
-                return res.status(404).json({ error: `"${searchArtist}" бойынша API деректері табылмады!` });
-            }
-
-            for (let i = 0; i < Math.min(3, items.length); i++) {
-                const item = items[i];
-                const arena = kzArenas[i];
-                const cover = item.artworkUrl100.replace('100x100bb', '600x800bb');
-                const eventDate = new Date(Date.now() + (i + 10) * 86400000).toISOString();
-                const basePrice = 9000 + (i * 2000);
-                const tourName = item.collectionName || item.trackName || 'Live Concert';
-
-                const insertRes = await pool.query(
-                    `INSERT INTO concerts (title, artist, concert_type, special_guests, city, venue, event_date, price_balcony, price_fanzone, price_vip, available_seats, image_url)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 240, $11) RETURNING *`,
-                    [
-                        `${tourName} Live Tour`.substring(0, 140),
-                        item.artistName.substring(0, 95),
-                        'API Концерт',
-                        `Жанр: ${item.primaryGenreName || 'Live Music'}`,
-                        arena.city,
-                        arena.venue,
-                        eventDate,
-                        basePrice,
-                        basePrice * 2,
-                        basePrice * 3.5,
                         cover
                     ]
                 );
                 insertedConcerts.push(insertRes.rows[0]);
+                counter++;
             }
         }
 
         res.json({ success: true, count: insertedConcerts.length, concerts: insertedConcerts });
     } catch (err) {
         console.error('API Sync қатесі:', err);
-        res.status(500).json({ error: 'Сыртқы API-мен байланыс қатесі' });
+        res.status(500).json({ error: 'Сыртқы API-лермен байланыс қатесі' });
     }
 });
 

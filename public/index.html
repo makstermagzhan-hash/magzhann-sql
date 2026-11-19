@@ -64,7 +64,6 @@
                     <input type="text" id="search-input" placeholder="Әртіс, концерт немесе стадион іздеу..." oninput="loadConcerts()">
                 </div>
 
-                <!-- API АРҚЫЛЫ ӘРТІС КОНЦЕРТТЕРІН АВТОМАТТЫ ЖҮКТЕУ -->
                 <div class="api-sync-bar">
                     <input type="text" id="api-artist-input" placeholder="API-ден әртіс турларын жүктеу (мыс: Coldplay, Ninety One, Sadraddin)...">
                     <button type="button" id="sync-api-btn" onclick="syncRealConcertsFromAPI()">
@@ -124,7 +123,7 @@
         <div class="container">
             <div class="profile-header-card" style="border-color: #38bdf8;">
                 <div class="profile-info">
-                    <div class="avatar-circle" style="background: linear-gradient(135deg, #0284c7, #38bdf8);">A</div>
+                    <div class="avatar-circle" style="background: linear-gradient(135deg, #0284c7, #38bdf8); color:#fff;">A</div>
                     <div>
                         <h2>TicketKZ Басқару Орталығы (Админ)</h2>
                         <p>Сатылымдар аналитикасы, билет сканері және концерттерді басқару</p>
@@ -135,7 +134,6 @@
                 </button>
             </div>
 
-            <!-- АДМИН СТАТИСТИКАСЫ -->
             <div class="analytics-grid">
                 <div class="stat-card">
                     <span class="stat-label"><i data-lucide="banknote"></i> Жалпы түсім (Касса)</span>
@@ -155,7 +153,6 @@
                 </div>
             </div>
 
-            <!-- БИЛЕТ КОДЫН ТЕКСЕРУ (БАҚЫЛАУШЫ СКАНЕРІ) -->
             <div style="background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 20px; margin-top: 24px;">
                 <h3 style="margin-top:0; display:flex; align-items:center; gap:8px; color:#38bdf8;">
                     <i data-lucide="scan-line"></i> Билетті тексеру (Кіру бақылауы)
@@ -172,11 +169,9 @@
                 <div id="verify-result-box" style="margin-top: 14px;"></div>
             </div>
 
-            <!-- КОНЦЕРТТЕРДІ БАСҚАРУ -->
             <h3 class="section-title"><i data-lucide="sliders"></i> Концерттер тізімі және бағаларын өңдеу</h3>
             <div id="admin-concerts-list" style="display:grid; gap:12px;"></div>
 
-            <!-- СОҢҒЫ САТЫЛЫМДАР -->
             <h3 class="section-title"><i data-lucide="receipt"></i> Сатылған билеттер журналы</h3>
             <div id="admin-bookings-list" style="display:grid; gap:10px;"></div>
         </div>
@@ -187,7 +182,7 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close-btn" onclick="closeModal('admin-login-modal')">&times;</span>
             <h2><i data-lucide="shield-check"></i> Админ-панельге кіру</h2>
-            <p class="modal-sub">Басқару панелін ашу үшін әкімші құпиясөзін енгізіңіз (Әдепкі: <b>admin2026</b>)</p>
+            <p class="modal-sub">Басқару панелін ашу үшін әкімші құпиясөзін енгізіңіз (<b>admin2026</b>)</p>
             <form id="admin-login-form">
                 <label>Құпиясөз:</label>
                 <input type="password" id="admin-pass-input" placeholder="••••••••" required>
@@ -287,7 +282,6 @@
                     <button type="button" onclick="zoomHall(0.15)"><i data-lucide="plus"></i></button>
                     <button type="button" onclick="zoomHall(-0.15)"><i data-lucide="minus"></i></button>
                 </div>
-
                 <div id="hall-canvas" class="hall-canvas"></div>
             </div>
 
@@ -444,7 +438,6 @@
         </div>
     </div>
 
-    <!-- ЖАСЫРЫН PDF БИЛЕТ ШАБЛОНЫ -->
     <div id="pdf-render-sandbox" style="position: fixed; left: -9999px; top: 0;"></div>
 
     <script src="app.js"></script>

@@ -178,7 +178,7 @@ function logoutUser() {
     switchTab('events');
 }
 
-// 6. НАҚТЫ СТАДИОН / МҰЗ АРЕНАСЫ / КОНЦЕРТ САРАЙЫНЫҢ СХЕМАЛАРЫ
+// 6. ЗАЛ / СТАДИОН / АРЕНА СХЕМАЛАРЫ
 function zoomHall(delta) {
     hallScale = Math.min(1.6, Math.max(0.65, hallScale + delta));
     document.getElementById('hall-canvas').style.transform = `scale(${hallScale})`;
@@ -233,7 +233,7 @@ async function openBookingModal(concert) {
         `;
 
         canvas.innerHTML = `
-            <div class="venue-arch-banner">🏟️ ${cleanVenueName.toUpperCase()} (АШЫҚ СТАДИОН СХЕМАСЫ — БАЛКОН ЖОҚ)</div>
+            <div class="venue-arch-banner">🏟️ ${cleanVenueName.toUpperCase()} (АШЫҚ СТАДИОН СХЕМАСЫ)</div>
             <div class="stadium-bowl">
                 <div class="hall-stage">САХНА / STAGE</div>
                 <div class="hall-upper-row">
@@ -484,7 +484,7 @@ document.getElementById('payment-form').addEventListener('submit', async (e) => 
     }
 });
 
-// 8. Профиль мен Аналитиканы жүктеу + PDF Билет жүктеу
+// 8. Профиль мен Аналитика + PDF Билет жүктеу
 async function loadProfileData() {
     if (!currentUser) return;
     const res = await fetch(`/api/profile/${currentUser.id}`);
@@ -558,7 +558,6 @@ async function loadProfileData() {
     });
 }
 
-// QR-КОДЫ БАР PDF-БИЛЕТ ЖҮКТЕУ ФУНКЦИЯСЫ
 async function downloadTicketPDF(ticketIndex) {
     const t = cachedUserTickets[ticketIndex];
     if (!t) return;
@@ -661,7 +660,7 @@ async function cancelTicket(id) {
     }
 }
 
-// 9. Сыртқы API сілтемелері арқылы КНИЖНЫЙ фото іздеу және ауыстыру
+// 9. API арқылы фото іздеу және ауыстыру
 function openPhotoModal(concertId, title, artist, currentUrl) {
     editingConcertId = concertId;
     document.getElementById('photo-modal-subtitle').textContent = title;
@@ -737,7 +736,7 @@ document.getElementById('photo-url-form').addEventListener('submit', async (e) =
     }
 });
 
-// 10. Жаңа шынайы концерт қосу формасы
+// 10. Жаңа концерт қосу формасы
 document.getElementById('add-concert-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const payload = {
@@ -765,14 +764,14 @@ document.getElementById('add-concert-form').addEventListener('submit', async (e)
     }
 });
 
-// 11. Ашық API арқылы әртістің концерттерін базаға жүктеу
+// 11. Ашық API арқылы 12 қалаға автоматты жүктеу
 async function syncRealConcertsFromAPI() {
     const input = document.getElementById('api-artist-input');
     const btn = document.getElementById('sync-api-btn');
     const artistQuery = input.value.trim() || 'Coldplay';
 
     btn.disabled = true;
-    btn.textContent = 'API жүктелуде...';
+    btn.textContent = '12 қалаға API жүктелуде...';
 
     try {
         const res = await fetch('/api/sync-real-concerts', {
@@ -826,7 +825,7 @@ document.getElementById('admin-login-form').addEventListener('submit', async (e)
         closeModal('admin-login-modal');
         switchTab('admin');
     } else {
-        alert('Құпиясөз қате! Қайта тексеріңіз (Әдепкі: admin2026)');
+        alert('Құпиясөз қате! Қайта тексеріңіз (admin2026)');
     }
 });
 
@@ -855,7 +854,6 @@ async function loadAdminDashboard() {
     document.getElementById('adm-concerts-count').textContent = data.stats.totalConcerts;
     document.getElementById('adm-users-count').textContent = data.stats.totalUsers;
 
-    // Концерттер тізімі
     const concertsList = document.getElementById('admin-concerts-list');
     concertsList.innerHTML = data.concerts.map(c => {
         const cJson = JSON.stringify(c).replace(/'/g, "&#39;");
@@ -881,7 +879,6 @@ async function loadAdminDashboard() {
         </div>
     `}).join('');
 
-    // Сатылымдар журналы
     const bookingsList = document.getElementById('admin-bookings-list');
     if (data.bookings.length === 0) {
         bookingsList.innerHTML = '<p style="color:#94a3b8">Әзірге сатылған билеттер жоқ.</p>';
