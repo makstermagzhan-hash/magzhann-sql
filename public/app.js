@@ -3,6 +3,8 @@ let currentConcert = null;
 let currentUser = JSON.parse(localStorage.getItem('ticketkz_user')) || null;
 let favorites = JSON.parse(localStorage.getItem('ticketkz_favs')) || [];
 let showingFavoritesOnly = false;
+let adminPassword = sessionStorage.getItem('ticketkz_admin_pass') || null;
+let cachedUserTickets = [];
 
 let hallScale = 1;
 let selectedSeatsList = [];
@@ -108,6 +110,7 @@ function switchTab(tab) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('section-events').classList.add('hidden');
     document.getElementById('section-profile').classList.add('hidden');
+    document.getElementById('section-admin').classList.add('hidden');
 
     if (tab === 'events') {
         showingFavoritesOnly = false;
@@ -123,6 +126,10 @@ function switchTab(tab) {
         document.getElementById('nav-profile').classList.add('active');
         document.getElementById('section-profile').classList.remove('hidden');
         loadProfileData();
+    } else if (tab === 'admin') {
+        document.getElementById('nav-admin').classList.add('active');
+        document.getElementById('section-admin').classList.remove('hidden');
+        loadAdminDashboard();
     }
 }
 
@@ -477,11 +484,12 @@ document.getElementById('payment-form').addEventListener('submit', async (e) => 
     }
 });
 
-// 8. Профиль мен Аналитиканы жүктеу
+// 8. Профиль мен Аналитиканы жүктеу + PDF Билет жүктеу
 async function loadProfileData() {
     if (!currentUser) return;
     const res = await fetch(`/api/profile/${currentUser.id}`);
     const data = await res.json();
+    cachedUserTickets = data.tickets || [];
 
     document.getElementById('prof-avatar').textContent = data.user.full_name[0].toUpperCase();
     document.getElementById('prof-name').textContent = data.user.full_name;
@@ -493,25 +501,37 @@ async function loadProfileData() {
     document.getElementById('stat-city').textContent = data.analytics.favoriteCity;
 
     const list = document.getElementById('my-tickets-list');
-    if (data.tickets.length === 0) {
+    if (cachedUserTickets.length === 0) {
         list.innerHTML = '<p style="color:#94a3b8">Сізде әлі сатып алынған билеттер жоқ.</p>';
         return;
     }
 
-    list.innerHTML = data.tickets.map(t => {
+    list.innerHTML = cachedUserTickets.map((t, index) => {
         const seatText = t.row_number ? `Қатар: ${t.row_number}, Орын: ${t.seat_number}` : 'Еркін кіру (Тұрып көру)';
+        const statusBadge = t.status === 'Used'
+            ? '<span style="background:#64748b; color:#fff; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-left:8px;">ПАЙДАЛАНЫЛҒАН</span>'
+            : '<span style="background:#16a34a; color:#fff; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-left:8px;">БЕЛСЕНДІ</span>';
+
         return `
         <div class="ticket-item">
             <div class="ticket-left">
-                <span class="ticket-code-badge">БИЛЕТ № ${t.ticket_code}</span>
+                <div style="display:flex; align-items:center; flex-wrap:wrap;">
+                    <span class="ticket-code-badge">БИЛЕТ № ${t.ticket_code}</span>
+                    ${statusBadge}
+                </div>
                 <h3>${t.artist} — ${t.title} (${t.concert_type})</h3>
                 <p class="info"><i data-lucide="map-pin"></i> <b>Өтетін орны:</b> ${t.city}, ${t.venue}</p>
                 <p class="info"><i data-lucide="calendar"></i> <b>Күні мен уақыты:</b> ${new Date(t.event_date).toLocaleString('kk-KZ')}</p>
                 <p class="info"><i data-lucide="armchair"></i> <b>Аймақ:</b> ${t.zone_name} (${seatText}) • <b>Саны:</b> ${t.quantity} билет</p>
                 <p class="info"><i data-lucide="credit-card"></i> <b>Төленген сома:</b> <strong style="color:#22c55e">${Number(t.total_price).toLocaleString()} ₸</strong></p>
-                <button class="cancel-ticket-btn" onclick="cancelTicket(${t.id})">
-                    <i data-lucide="trash-2"></i> Билетті қайтару
-                </button>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                    <button type="button" onclick="downloadTicketPDF(${index})" style="background:#0284c7; color:#fff; border:none; padding:9px 14px; border-radius:8px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                        <i data-lucide="file-down"></i> PDF Билет жүктеу
+                    </button>
+                    <button class="cancel-ticket-btn" style="margin-top:0;" onclick="cancelTicket(${t.id})">
+                        <i data-lucide="trash-2"></i> Билетті қайтару
+                    </button>
+                </div>
             </div>
             <div class="ticket-right">
                 <div id="qr-${t.id}"></div>
@@ -522,7 +542,7 @@ async function loadProfileData() {
 
     lucide.createIcons();
 
-    data.tickets.forEach(t => {
+    cachedUserTickets.forEach(t => {
         new QRCode(document.getElementById(`qr-${t.id}`), {
             text: `TICKETKZ|${t.ticket_code}|${t.artist}|${t.zone_name}|R${t.row_number}-S${t.seat_number}`,
             width: 110,
@@ -536,6 +556,101 @@ async function loadProfileData() {
             fontSize: 12
         });
     });
+}
+
+// QR-КОДЫ БАР PDF-БИЛЕТ ЖҮКТЕУ ФУНКЦИЯСЫ
+async function downloadTicketPDF(ticketIndex) {
+    const t = cachedUserTickets[ticketIndex];
+    if (!t) return;
+
+    const sandbox = document.getElementById('pdf-render-sandbox');
+    const seatText = t.row_number ? `Қатар ${t.row_number}, Орын ${t.seat_number}` : 'Еркін кіру';
+    const formattedDate = new Date(t.event_date).toLocaleString('kk-KZ', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    sandbox.innerHTML = `
+        <div id="pdf-ticket-card" style="width: 680px; background: #ffffff; color: #0f172a; font-family: Arial, sans-serif; border: 2px solid #0284c7; border-radius: 16px; overflow: hidden; padding: 0;">
+            <div style="background: linear-gradient(135deg, #0f172a, #1e3a8a); color: #ffffff; padding: 20px 28px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-size: 24px; font-weight: 800; letter-spacing: 1px;">Ticket<span style="color: #38bdf8;">KZ</span></div>
+                    <div style="font-size: 12px; color: #cbd5e1; margin-top: 2px;">РЕСМИ ЭЛЕКТРОНДЫ БИЛЕТ / OFFICIAL E-TICKET</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="background: #38bdf8; color: #0f172a; font-weight: 800; padding: 6px 12px; border-radius: 8px; font-size: 14px;">
+                        ${t.ticket_code}
+                    </div>
+                </div>
+            </div>
+
+            <div style="padding: 24px 28px; display: flex; justify-content: space-between; gap: 20px;">
+                <div style="flex: 1;">
+                    <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700;">Іс-шара / Концерт</div>
+                    <div style="font-size: 22px; font-weight: 800; color: #0f172a; margin: 4px 0 14px 0;">${t.artist} — ${t.title}</div>
+
+                    <div style="margin-bottom: 10px;">
+                        <span style="font-size: 12px; color: #64748b;">Өтетін орны:</span><br>
+                        <strong style="font-size: 14px;">${t.city}, ${t.venue}</strong>
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <span style="font-size: 12px; color: #64748b;">Күні мен уақыты:</span><br>
+                        <strong style="font-size: 14px;">${formattedDate}</strong>
+                    </div>
+
+                    <div style="display: flex; gap: 20px; margin-top: 14px; background: #f1f5f9; padding: 12px; border-radius: 10px;">
+                        <div>
+                            <span style="font-size: 11px; color: #64748b;">АЙМАҚ / СЕКТОР</span><br>
+                            <strong style="font-size: 14px; color: #0284c7;">${t.zone_name}</strong>
+                        </div>
+                        <div>
+                            <span style="font-size: 11px; color: #64748b;">ОРЫН</span><br>
+                            <strong style="font-size: 14px;">${seatText}</strong>
+                        </div>
+                        <div>
+                            <span style="font-size: 11px; color: #64748b;">БАҒАСЫ</span><br>
+                            <strong style="font-size: 14px; color: #16a34a;">${Number(t.total_price).toLocaleString()} ₸</strong>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 14px; font-size: 12px; color: #475569;">
+                        Билет иесі: <strong>${currentUser.full_name}</strong> (${currentUser.email})
+                    </div>
+                </div>
+
+                <div style="width: 170px; border-left: 2px dashed #cbd5e1; padding-left: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                    <div id="pdf-qr-box" style="padding: 8px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;"></div>
+                    <div style="font-size: 11px; color: #64748b; margin-top: 8px;">Кіреберісте QR-кодты сканерлеңіз</div>
+                    <div style="font-size: 13px; font-weight: 800; margin-top: 4px; color: #0f172a;">${t.ticket_code}</div>
+                </div>
+            </div>
+
+            <div style="background: #f8fafc; padding: 10px 28px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b; display: flex; justify-content: space-between;">
+                <span>TicketKZ онлайн билет жүйесі • 24/7</span>
+                <span>Жарамдылық статусы: ${t.status === 'Used' ? 'Пайдаланылған' : 'Белсенді'}</span>
+            </div>
+        </div>
+    `;
+
+    new QRCode(document.getElementById('pdf-qr-box'), {
+        text: `TICKETKZ|${t.ticket_code}|${t.artist}|${t.zone_name}|R${t.row_number}-S${t.seat_number}`,
+        width: 135,
+        height: 135
+    });
+
+    await new Promise(r => setTimeout(r, 250));
+
+    const element = document.getElementById('pdf-ticket-card');
+    const opt = {
+        margin: 10,
+        filename: `TicketKZ_${t.ticket_code}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+
+    await html2pdf().set(opt).from(element).save();
+    sandbox.innerHTML = '';
 }
 
 async function cancelTicket(id) {
@@ -682,4 +797,207 @@ async function syncRealConcertsFromAPI() {
         btn.innerHTML = '<i data-lucide="globe"></i> API Билеттер Қосу';
         lucide.createIcons();
     }
+}
+
+// ================= 12. АДМИН-ПАНЕЛЬ ЛОГИКАСЫ =================
+
+function openAdminOrLogin() {
+    if (!adminPassword) {
+        document.getElementById('admin-login-modal').classList.remove('hidden');
+    } else {
+        switchTab('admin');
+    }
+}
+
+document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pass = document.getElementById('admin-pass-input').value;
+
+    const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pass })
+    });
+
+    if (res.ok) {
+        adminPassword = pass;
+        sessionStorage.setItem('ticketkz_admin_pass', pass);
+        document.getElementById('admin-login-form').reset();
+        closeModal('admin-login-modal');
+        switchTab('admin');
+    } else {
+        alert('Құпиясөз қате! Қайта тексеріңіз (Әдепкі: admin2026)');
+    }
+});
+
+function logoutAdmin() {
+    adminPassword = null;
+    sessionStorage.removeItem('ticketkz_admin_pass');
+    switchTab('events');
+}
+
+async function loadAdminDashboard() {
+    if (!adminPassword) return;
+
+    const res = await fetch('/api/admin/dashboard', {
+        headers: { 'x-admin-password': adminPassword }
+    });
+
+    if (!res.ok) {
+        logoutAdmin();
+        return;
+    }
+
+    const data = await res.json();
+
+    document.getElementById('adm-revenue').textContent = `${data.stats.totalRevenue.toLocaleString()} ₸`;
+    document.getElementById('adm-sold').textContent = `${data.stats.totalSold} дана`;
+    document.getElementById('adm-concerts-count').textContent = data.stats.totalConcerts;
+    document.getElementById('adm-users-count').textContent = data.stats.totalUsers;
+
+    // Концерттер тізімі
+    const concertsList = document.getElementById('admin-concerts-list');
+    concertsList.innerHTML = data.concerts.map(c => {
+        const cJson = JSON.stringify(c).replace(/'/g, "&#39;");
+        return `
+        <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+                <strong style="font-size:1.05rem; color:#f8fafc;">${c.artist} — ${c.title}</strong>
+                <div style="color:#94a3b8; font-size:0.85rem; margin-top:4px;">
+                    ${c.city} • ${c.venue} • ${new Date(c.event_date).toLocaleString('kk-KZ')}
+                </div>
+                <div style="color:#38bdf8; font-size:0.85rem; margin-top:4px;">
+                    Бағалар: ${Number(c.price_balcony).toLocaleString()} / ${Number(c.price_fanzone).toLocaleString()} / ${Number(c.price_vip).toLocaleString()} ₸ • Бос орын: <b>${c.available_seats}</b>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <button type="button" onclick='openEditConcertModal(${cJson})' style="background:#0ea5e9; color:#fff; border:none; padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer;">
+                    Өңдеу
+                </button>
+                <button type="button" onclick="deleteConcertAdmin(${c.id})" style="background:#ef4444; color:#fff; border:none; padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer;">
+                    Өшіру
+                </button>
+            </div>
+        </div>
+    `}).join('');
+
+    // Сатылымдар журналы
+    const bookingsList = document.getElementById('admin-bookings-list');
+    if (data.bookings.length === 0) {
+        bookingsList.innerHTML = '<p style="color:#94a3b8">Әзірге сатылған билеттер жоқ.</p>';
+    } else {
+        bookingsList.innerHTML = data.bookings.map(b => {
+            const isUsed = b.status === 'Used';
+            return `
+            <div style="background:#0f172a; border:1px solid #1e293b; border-radius:10px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <span style="background:#1e293b; color:#38bdf8; padding:3px 8px; border-radius:6px; font-weight:700; font-size:0.8rem;">${b.ticket_code}</span>
+                    <span style="background:${isUsed ? '#475569' : '#15803d'}; color:#fff; padding:3px 8px; border-radius:6px; font-size:0.75rem; margin-left:6px;">
+                        ${isUsed ? 'ӨТКІЗІЛГЕН (Used)' : 'БЕЛСЕНДІ'}
+                    </span>
+                    <strong style="margin-left:8px;">${b.artist} — ${b.title}</strong>
+                    <div style="color:#94a3b8; font-size:0.83rem; margin-top:4px;">
+                        Сатып алушы: <b>${b.full_name || 'Белгісіз'}</b> (${b.email || ''}) • Аймақ: ${b.zone_name} (Қатар ${b.row_number}, Орын ${b.seat_number})
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <strong style="color:#22c55e;">+${Number(b.total_price).toLocaleString()} ₸</strong>
+                    <div style="color:#64748b; font-size:0.78rem;">${new Date(b.booking_date).toLocaleString('kk-KZ')}</div>
+                </div>
+            </div>
+        `}).join('');
+    }
+
+    lucide.createIcons();
+}
+
+function openEditConcertModal(concert) {
+    document.getElementById('edit-c-id').value = concert.id;
+    document.getElementById('edit-c-artist').value = concert.artist;
+    document.getElementById('edit-c-title').value = concert.title;
+    document.getElementById('edit-c-city').value = concert.city;
+    document.getElementById('edit-c-venue').value = concert.venue;
+    document.getElementById('edit-c-seats').value = concert.available_seats;
+    document.getElementById('edit-c-bal').value = concert.price_balcony;
+    document.getElementById('edit-c-fan').value = concert.price_fanzone;
+    document.getElementById('edit-c-vip').value = concert.price_vip;
+    document.getElementById('edit-concert-modal').classList.remove('hidden');
+}
+
+document.getElementById('edit-concert-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('edit-c-id').value;
+    const payload = {
+        artist: document.getElementById('edit-c-artist').value,
+        title: document.getElementById('edit-c-title').value,
+        city: document.getElementById('edit-c-city').value,
+        venue: document.getElementById('edit-c-venue').value,
+        available_seats: Number(document.getElementById('edit-c-seats').value),
+        price_balcony: Number(document.getElementById('edit-c-bal').value),
+        price_fanzone: Number(document.getElementById('edit-c-fan').value),
+        price_vip: Number(document.getElementById('edit-c-vip').value)
+    };
+
+    const res = await fetch(`/api/admin/concerts/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-admin-password': adminPassword
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+        closeModal('edit-concert-modal');
+        loadAdminDashboard();
+    } else {
+        alert('Сақтау қатесі!');
+    }
+});
+
+async function deleteConcertAdmin(id) {
+    if (!confirm('Бұл концертті базадан толық өшіргіңіз келе ме?')) return;
+    const res = await fetch(`/api/admin/concerts/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-password': adminPassword }
+    });
+    if (res.ok) {
+        loadAdminDashboard();
+    }
+}
+
+async function verifyTicketCode(markUsed) {
+    const code = document.getElementById('verify-code-input').value.trim();
+    const box = document.getElementById('verify-result-box');
+    if (!code) return;
+
+    const res = await fetch('/api/admin/verify-ticket', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-admin-password': adminPassword
+        },
+        body: JSON.stringify({ ticket_code: code, markUsed })
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.valid) {
+        box.innerHTML = `<div style="background:rgba(239,68,68,0.15); border:1px solid #ef4444; color:#fca5a5; padding:12px; border-radius:10px;">❌ ${data.error}</div>`;
+        return;
+    }
+
+    const t = data.ticket;
+    const isUsed = t.status === 'Used';
+    box.innerHTML = `
+        <div style="background:rgba(34,197,94,0.12); border:1px solid #22c55e; color:#f8fafc; padding:14px; border-radius:10px;">
+            <div style="font-weight:700; color:#4ade80; font-size:1.05rem;">
+                ✅ Билет расталды: ${t.ticket_code} (${isUsed ? 'ӨТКІЗІЛГЕН — Used' : 'КІРУГЕ РҰҚСАТ'})
+            </div>
+            <div style="margin-top:6px; font-size:0.9rem; color:#cbd5e1;">
+                <b>Концерт:</b> ${t.artist} — ${t.title} (${t.city})<br>
+                <b>Иесі:</b> ${t.full_name} • <b>Орын:</b> ${t.zone_name}, Қатар ${t.row_number}, Орын ${t.seat_number}
+            </div>
+        </div>
+    `;
+    if (markUsed) loadAdminDashboard();
 }

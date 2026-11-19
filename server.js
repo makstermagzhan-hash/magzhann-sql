@@ -5,6 +5,7 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin2026';
 
 app.use(cors());
 app.use(express.json());
@@ -327,6 +328,124 @@ app.delete('/api/bookings/:id', async (req, res) => {
         res.status(400).json({ error: err.message });
     } finally {
         client.release();
+    }
+});
+
+// ================= АДМИН-ПАНЕЛЬ API =================
+
+function checkAdmin(req, res, next) {
+    const pass = req.headers['x-admin-password'] || req.body?.password || req.query?.password;
+    if (pass !== ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'Админ құпиясөзі қате!' });
+    }
+    next();
+}
+
+// 10. Админ авторизациясы
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    if (password === ADMIN_PASSWORD) {
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ error: 'Құпиясөз қате!' });
+    }
+});
+
+// 11. Админ жалпы статистика, концерттер және сатылымдар
+app.get('/api/admin/dashboard', checkAdmin, async (req, res) => {
+    try {
+        const statsRes = await pool.query(`
+            SELECT 
+                COALESCE(SUM(total_price), 0) AS total_revenue,
+                COALESCE(SUM(quantity), 0) AS total_sold
+            FROM bookings
+        `);
+        const usersCountRes = await pool.query('SELECT COUNT(*) AS count FROM users');
+        const concertsRes = await pool.query('SELECT * FROM concerts ORDER BY event_date ASC');
+        const bookingsRes = await pool.query(`
+            SELECT b.*, u.full_name, u.email, u.phone, c.artist, c.title, c.city, c.venue, c.event_date
+            FROM bookings b
+            LEFT JOIN users u ON b.user_id = u.id
+            LEFT JOIN concerts c ON b.concert_id = c.id
+            ORDER BY b.booking_date DESC
+            LIMIT 100
+        `);
+
+        res.json({
+            stats: {
+                totalRevenue: Number(statsRes.rows[0].total_revenue),
+                totalSold: Number(statsRes.rows[0].total_sold),
+                totalUsers: Number(usersCountRes.rows[0].count),
+                totalConcerts: concertsRes.rows.length
+            },
+            concerts: concertsRes.rows,
+            bookings: bookingsRes.rows
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Админ деректерін жүктеу қатесі' });
+    }
+});
+
+// 12. Концерт бағасы мен атауын өңдеу
+app.put('/api/admin/concerts/:id', checkAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { title, artist, city, venue, price_balcony, price_fanzone, price_vip, available_seats } = req.body;
+    try {
+        const result = await pool.query(
+            `UPDATE concerts 
+             SET title = $1, artist = $2, city = $3, venue = $4, price_balcony = $5, price_fanzone = $6, price_vip = $7, available_seats = $8
+             WHERE id = $9 RETURNING *`,
+            [title, artist, city, venue, price_balcony, price_fanzone, price_vip, available_seats, id]
+        );
+        res.json({ success: true, concert: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: 'Концертті жаңарту қатесі' });
+    }
+});
+
+// 13. Концертті өшіру
+app.delete('/api/admin/concerts/:id', checkAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM concerts WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Концертті өшіру қатесі' });
+    }
+});
+
+// 14. Билет кодын (TKZ-XXXXXX) тексеру және өткізу (Валидация)
+app.post('/api/admin/verify-ticket', checkAdmin, async (req, res) => {
+    const { ticket_code, markUsed } = req.body;
+    if (!ticket_code) return res.status(400).json({ error: 'Билет кодын енгізіңіз!' });
+
+    try {
+        const cleanCode = ticket_code.trim().toUpperCase();
+        const bRes = await pool.query(`
+            SELECT b.*, u.full_name, u.phone, c.artist, c.title, c.city, c.venue, c.event_date
+            FROM bookings b
+            LEFT JOIN users u ON b.user_id = u.id
+            LEFT JOIN concerts c ON b.concert_id = c.id
+            WHERE b.ticket_code = $1
+        `, [cleanCode]);
+
+        if (bRes.rows.length === 0) {
+            return res.status(404).json({ valid: false, error: 'Мұндай кодты билет базадан табылмады!' });
+        }
+
+        let ticket = bRes.rows[0];
+        if (markUsed && ticket.status !== 'Used') {
+            const upd = await pool.query(
+                "UPDATE bookings SET status = 'Used' WHERE id = $1 RETURNING *",
+                [ticket.id]
+            );
+            ticket.status = upd.rows[0].status;
+        }
+
+        res.json({ valid: true, ticket });
+    } catch (err) {
+        res.status(500).json({ error: 'Тексеру қатесі' });
     }
 });
 

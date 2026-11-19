@@ -8,6 +8,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 
@@ -25,6 +26,9 @@
                 </button>
                 <button class="nav-btn" onclick="document.getElementById('add-concert-modal').classList.remove('hidden')">
                     <i data-lucide="plus-circle"></i> Концерт қосу
+                </button>
+                <button class="nav-btn" id="nav-admin" onclick="openAdminOrLogin()">
+                    <i data-lucide="shield-check"></i> Админ
                 </button>
                 <button class="nav-btn profile-pill" id="nav-profile" onclick="openProfileOrAuth()">
                     <i data-lucide="user"></i> <span id="nav-user-name">Кіру / Профиль</span>
@@ -110,10 +114,127 @@
                 </div>
             </div>
 
-            <h3 class="section-title"><i data-lucide="qr-code"></i> Менің электронды билеттерім (Тарих)</h3>
+            <h3 class="section-title"><i data-lucide="qr-code"></i> Менің электронды билеттерім (Тарих және PDF)</h3>
             <div id="my-tickets-list" class="tickets-list"></div>
         </div>
     </section>
+
+    <!-- АДМИН-ПАНЕЛЬ БӨЛІМІ -->
+    <section id="section-admin" class="hidden">
+        <div class="container">
+            <div class="profile-header-card" style="border-color: #38bdf8;">
+                <div class="profile-info">
+                    <div class="avatar-circle" style="background: linear-gradient(135deg, #0284c7, #38bdf8);">A</div>
+                    <div>
+                        <h2>TicketKZ Басқару Орталығы (Админ)</h2>
+                        <p>Сатылымдар аналитикасы, билет сканері және концерттерді басқару</p>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="logoutAdmin()">
+                    <i data-lucide="log-out"></i> Админнен шығу
+                </button>
+            </div>
+
+            <!-- АДМИН СТАТИСТИКАСЫ -->
+            <div class="analytics-grid">
+                <div class="stat-card">
+                    <span class="stat-label"><i data-lucide="banknote"></i> Жалпы түсім (Касса)</span>
+                    <strong class="stat-value accent" id="adm-revenue">0 ₸</strong>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label"><i data-lucide="ticket"></i> Сатылған билеттер</span>
+                    <strong class="stat-value" id="adm-sold">0 дана</strong>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label"><i data-lucide="music"></i> Белсенді концерттер</span>
+                    <strong class="stat-value" id="adm-concerts-count">0</strong>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label"><i data-lucide="users"></i> Тіркелген қолданушылар</span>
+                    <strong class="stat-value" id="adm-users-count">0</strong>
+                </div>
+            </div>
+
+            <!-- БИЛЕТ КОДЫН ТЕКСЕРУ (БАҚЫЛАУШЫ СКАНЕРІ) -->
+            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 20px; margin-top: 24px;">
+                <h3 style="margin-top:0; display:flex; align-items:center; gap:8px; color:#38bdf8;">
+                    <i data-lucide="scan-line"></i> Билетті тексеру (Кіру бақылауы)
+                </h3>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                    <input type="text" id="verify-code-input" placeholder="Билет кодын енгізіңіз (мыс: TKZ-482910)..." style="flex:1; min-width:220px; margin-top:0; text-transform:uppercase;">
+                    <button type="button" onclick="verifyTicketCode(false)" style="background:#0ea5e9; color:#fff; border:none; padding:12px 20px; border-radius:10px; font-weight:700; cursor:pointer;">
+                        Тексеру
+                    </button>
+                    <button type="button" onclick="verifyTicketCode(true)" style="background:#16a34a; color:#fff; border:none; padding:12px 20px; border-radius:10px; font-weight:700; cursor:pointer;">
+                        Өткізу (Used белгісін қою)
+                    </button>
+                </div>
+                <div id="verify-result-box" style="margin-top: 14px;"></div>
+            </div>
+
+            <!-- КОНЦЕРТТЕРДІ БАСҚАРУ -->
+            <h3 class="section-title"><i data-lucide="sliders"></i> Концерттер тізімі және бағаларын өңдеу</h3>
+            <div id="admin-concerts-list" style="display:grid; gap:12px;"></div>
+
+            <!-- СОҢҒЫ САТЫЛЫМДАР -->
+            <h3 class="section-title"><i data-lucide="receipt"></i> Сатылған билеттер журналы</h3>
+            <div id="admin-bookings-list" style="display:grid; gap:10px;"></div>
+        </div>
+    </section>
+
+    <!-- МОДАЛЬ: АДМИН КІРУ -->
+    <div id="admin-login-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close-btn" onclick="closeModal('admin-login-modal')">&times;</span>
+            <h2><i data-lucide="shield-check"></i> Админ-панельге кіру</h2>
+            <p class="modal-sub">Басқару панелін ашу үшін әкімші құпиясөзін енгізіңіз (Әдепкі: <b>admin2026</b>)</p>
+            <form id="admin-login-form">
+                <label>Құпиясөз:</label>
+                <input type="password" id="admin-pass-input" placeholder="••••••••" required>
+                <button type="submit" class="submit-btn" style="margin-top:16px;">Кіру</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬ: КОНЦЕРТТІ ӨҢДЕУ (АДМИН) -->
+    <div id="edit-concert-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('edit-concert-modal')">&times;</span>
+            <h2><i data-lucide="edit-3"></i> Концерт деректерін өңдеу</h2>
+            <form id="edit-concert-form">
+                <input type="hidden" id="edit-c-id">
+                <label>Әртіс:</label>
+                <input type="text" id="edit-c-artist" required>
+                <label>Концерт атауы:</label>
+                <input type="text" id="edit-c-title" required>
+                <div class="two-cols">
+                    <div>
+                        <label>Қала:</label>
+                        <input type="text" id="edit-c-city" required>
+                    </div>
+                    <div>
+                        <label>Қалған орындар:</label>
+                        <input type="number" id="edit-c-seats" required>
+                    </div>
+                </div>
+                <label>Өтетін орны:</label>
+                <input type="text" id="edit-c-venue" required>
+                <div class="two-cols">
+                    <div>
+                        <label>Балкон / Трибуна (₸):</label>
+                        <input type="number" id="edit-c-bal" required>
+                    </div>
+                    <div>
+                        <label>Фан-зона (₸):</label>
+                        <input type="number" id="edit-c-fan" required>
+                    </div>
+                </div>
+                <label>VIP бағасы (₸):</label>
+                <input type="number" id="edit-c-vip" required>
+                <button type="submit" class="submit-btn" style="margin-top:14px;">Өзгерістерді сақтау</button>
+            </form>
+        </div>
+    </div>
 
     <!-- МОДАЛЬ 1: ПРОФИЛЬГЕ КІРУ / ТІРКЕЛУ -->
     <div id="auth-modal" class="modal hidden">
@@ -322,6 +443,9 @@
             </form>
         </div>
     </div>
+
+    <!-- ЖАСЫРЫН PDF БИЛЕТ ШАБЛОНЫ -->
+    <div id="pdf-render-sandbox" style="position: fixed; left: -9999px; top: 0;"></div>
 
     <script src="app.js"></script>
 </body>

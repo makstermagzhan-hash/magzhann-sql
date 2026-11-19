@@ -156,8 +156,26 @@ form input, form select { width: 100%; padding: 10px; margin-top: 5px; border-ra
 .ticket-left { padding: 20px; border-right: 2px dashed #475569; }
 .ticket-code-badge { background: #0f172a; color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-weight: 700; display: inline-block; margin-bottom: 8px; }
 .ticket-right { background: #ffffff; color: #0f172a; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
-.cancel-ticket-btn { margin-top: 12px; background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 5px; }
+.cancel-ticket-btn { margin-top: 12px; background: transparent; border: 1px solid #ef4444; color: #ef4444; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s; }
+.cancel-ticket-btn:hover { background: rgba(239, 68, 68, 0.14); }
+
+/* PDF Билет жүктеу және Админ-панель элементтері */
+#verify-code-input {
+    padding: 11px 16px;
+    border-radius: 10px;
+    border: 1px solid #334155;
+    background: #0f172a;
+    color: #fff;
+    outline: none;
+    font-family: monospace;
+    font-size: 0.95rem;
+}
+#verify-code-input:focus {
+    border-color: #38bdf8;
+}
+
 @media (max-width: 720px) {
     .ticket-item { grid-template-columns: 1fr; }
     .ticket-left { border-right: none; border-bottom: 2px dashed #475569; }
+    .api-sync-bar { flex-direction: column; }
 }
