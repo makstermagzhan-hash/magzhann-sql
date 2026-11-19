@@ -10,21 +10,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Хостингте (Neon / Render) DATABASE_URL арқылы, ал локальды компьютерде localhost арқылы қосылады
-const pool = new Pool(
-    process.env.DATABASE_URL
-        ? {
-              connectionString: process.env.DATABASE_URL,
-              ssl: { rejectUnauthorized: false }
-          }
-        : {
-              user: 'postgres',
-              host: 'localhost',
-              database: 'concert_tickets',
-              password: '123456789',
-              port: 5432,
-          }
-);
+const NEON_DB_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_QB0YoH4IpSMw@ep-frosty-brook-bekarcd3-pooler.c-9.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+
+const pool = new Pool({
+    connectionString: NEON_DB_URL,
+    ssl: { rejectUnauthorized: false }
+});
 
 // 1. Барлық концерттерді алу (қала және іздеу сүзгісімен)
 app.get('/api/concerts', async (req, res) => {
