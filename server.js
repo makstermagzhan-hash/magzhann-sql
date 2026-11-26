@@ -10,7 +10,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin2026';
 
-// JSON деректерін қабылдау, CORS рұқсаты және public папкасын ашу
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -40,7 +39,6 @@ async function initDatabase() {
         );
     `);
 
-    // Ескі кесте болса, жаңа есеп бағандарын қауіпсіз қосу
     await pool.query(`
         ALTER TABLE users ADD COLUMN IF NOT EXISTS tickets_bought INT DEFAULT 0;
         ALTER TABLE users ADD COLUMN IF NOT EXISTS total_spent NUMERIC(12, 2) DEFAULT 0;
@@ -62,7 +60,6 @@ async function initDatabase() {
         );
     `);
 
-    // Негізгі админ аккаунтын қосу (бар болса қайталамайды)
     await pool.query(`
         INSERT INTO admins (admin_name, role, email, admin_password, site_name, site_url, total_revenue, sold_tickets)
         VALUES ('Абилкайдар Мағжан', 'TicketKZ Басқару Орталығы (Админ)', 'makstermagzhan@gmail.com', 'admin2026', 'TicketKZ', 'https://magzhann-sqly.onrender.com', 0, 0)
@@ -84,9 +81,16 @@ async function initDatabase() {
             price_fanzone NUMERIC(10, 2) NOT NULL,
             price_vip NUMERIC(10, 2) NOT NULL,
             available_seats INT NOT NULL,
+            tickets_sold INT DEFAULT 0,
+            concert_revenue NUMERIC(12, 2) DEFAULT 0,
             image_url TEXT,
             UNIQUE(title, city, event_date)
         );
+    `);
+
+    await pool.query(`
+        ALTER TABLE concerts ADD COLUMN IF NOT EXISTS tickets_sold INT DEFAULT 0;
+        ALTER TABLE concerts ADD COLUMN IF NOT EXISTS concert_revenue NUMERIC(12, 2) DEFAULT 0;
     `);
 
     // 2.4. Брондау және билеттер (bookings) кестесі
@@ -111,31 +115,38 @@ async function initDatabase() {
         ALTER TABLE bookings ADD COLUMN IF NOT EXISTS concert_title VARCHAR(255);
     `);
 
-    // 2.5. Автоматты триггер: Билет сатылғанда/өшірілгенде админ кассасы мен қолданушы есебін жаңарту
+    // 2.5. Автоматты триггер: Барлық 4 кестедегі сандарды синхрондау
     await pool.query(`
         CREATE OR REPLACE FUNCTION sync_user_and_admin_totals()
         RETURNS TRIGGER AS $$
         BEGIN
-            -- Админнің жалпы табысы мен сатылған билеттер санын жаңарту
             UPDATE admins
             SET total_revenue = COALESCE((SELECT SUM(total_price) FROM bookings), 0),
                 sold_tickets = COALESCE((SELECT SUM(quantity) FROM bookings), 0)
             WHERE email = 'makstermagzhan@gmail.com';
 
-            -- Жаңа билет алынғанда қолданушының билет саны мен жұмсаған ақшасын жаңарту
             IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
                 UPDATE users
                 SET tickets_bought = COALESCE((SELECT SUM(quantity) FROM bookings WHERE user_id = NEW.user_id), 0),
                     total_spent = COALESCE((SELECT SUM(total_price) FROM bookings WHERE user_id = NEW.user_id), 0)
                 WHERE id = NEW.user_id;
+
+                UPDATE concerts
+                SET tickets_sold = COALESCE((SELECT SUM(quantity) FROM bookings WHERE concert_id = NEW.concert_id), 0),
+                    concert_revenue = COALESCE((SELECT SUM(total_price) FROM bookings WHERE concert_id = NEW.concert_id), 0)
+                WHERE id = NEW.concert_id;
             END IF;
 
-            -- Билет қайтарылғанда (өшірілгенде) қолданушының есебін жаңарту
             IF (TG_OP = 'DELETE' OR TG_OP = 'UPDATE') THEN
                 UPDATE users
                 SET tickets_bought = COALESCE((SELECT SUM(quantity) FROM bookings WHERE user_id = OLD.user_id), 0),
                     total_spent = COALESCE((SELECT SUM(total_price) FROM bookings WHERE user_id = OLD.user_id), 0)
                 WHERE id = OLD.user_id;
+
+                UPDATE concerts
+                SET tickets_sold = COALESCE((SELECT SUM(quantity) FROM bookings WHERE concert_id = OLD.concert_id), 0),
+                    concert_revenue = COALESCE((SELECT SUM(total_price) FROM bookings WHERE concert_id = OLD.concert_id), 0)
+                WHERE id = OLD.concert_id;
             END IF;
 
             RETURN NULL;
@@ -195,10 +206,19 @@ async function initDatabase() {
 }
 
 // =========================================================================
-// 3. КОНЦЕРТТЕР МЕН API СИНХРОНДАУ МАРШРУТТАРЫ
+// 3. АДМИН ТЕКСЕРУ MIDDLEWARE
 // =========================================================================
+function checkAdmin(req, res, next) {
+    const pass = req.headers['x-admin-password'] || req.body?.password || req.query?.password;
+    if (pass !== ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'Тек Админ аккаунтпен кірген соң ғана рұқсат етіледі!' });
+    }
+    next();
+}
 
-// Барлық концерттер тізімін алу (қала және іздеу бойынша сүзгілеу)
+// =========================================================================
+// 4. КОНЦЕРТТЕР МЕН СУРЕТ ЖАҢАРТУ МАРШРУТТАРЫ
+// =========================================================================
 app.get('/api/concerts', async (req, res) => {
     try {
         const { city, search } = req.query;
@@ -220,7 +240,6 @@ app.get('/api/concerts', async (req, res) => {
     }
 });
 
-// iTunes API арқылы әртіс суреттері мен концерттерін 12 қалаға жүктеу
 app.post('/api/sync-real-concerts', async (req, res) => {
     const searchArtist = (req.body.artistQuery || 'Coldplay').trim();
     try {
@@ -259,7 +278,6 @@ app.post('/api/sync-real-concerts', async (req, res) => {
     }
 });
 
-// Жаңа концерт қосу
 app.post('/api/concerts', async (req, res) => {
     const { title, artist, concert_type, special_guests, city, venue, event_date, price_balcony, price_fanzone, price_vip, image_url } = req.body;
     try {
@@ -275,10 +293,10 @@ app.post('/api/concerts', async (req, res) => {
     }
 });
 
-// Концерттің суретін (постерін) жаңарту маршруты (PUT /api/concerts/:id/image және PUT /api/concerts/:id)
-app.put('/api/concerts/:id/image', async (req, res) => {
+// Концерттің суретін (постерін) жаңарту — ТЕК АДМИНГЕ РҰҚСАТ (checkAdmin)
+app.put('/api/concerts/:id/image', checkAdmin, async (req, res) => {
     const { image_url } = req.body;
-    if (!image_url) return res.status(400).json({ error: 'Сурет сілтемесі жок!' });
+    if (!image_url) return res.status(400).json({ error: 'Сурет сілтемесі жоқ!' });
     try {
         const { rows } = await pool.query(
             'UPDATE concerts SET image_url = $1 WHERE id = $2 RETURNING *',
@@ -291,7 +309,7 @@ app.put('/api/concerts/:id/image', async (req, res) => {
     }
 });
 
-app.put('/api/concerts/:id', async (req, res) => {
+app.put('/api/concerts/:id', checkAdmin, async (req, res) => {
     const { image_url } = req.body;
     try {
         const { rows } = await pool.query(
@@ -304,7 +322,6 @@ app.put('/api/concerts/:id', async (req, res) => {
     }
 });
 
-// Концерттегі сатылып қойған орындарды алу
 app.get('/api/concerts/:id/booked-seats', async (req, res) => {
     try {
         const { rows } = await pool.query('SELECT zone_name, row_number, seat_number FROM bookings WHERE concert_id = $1', [req.params.id]);
@@ -315,10 +332,8 @@ app.get('/api/concerts/:id/booked-seats', async (req, res) => {
 });
 
 // =========================================================================
-// 4. ПАЙДАЛАНУШЫ ПРОФИЛІ ЖӘНЕ БИЛЕТ САТЫП АЛУ (БРОНДАУ)
+// 5. ПАЙДАЛАНУШЫ ПРОФИЛІ ЖӘНЕ БИЛЕТ САТЫП АЛУ
 // =========================================================================
-
-// Тіркелу және профильге кіру
 app.post('/api/auth', async (req, res) => {
     const { full_name, email, phone, city } = req.body;
     if (!email || !full_name) return res.status(400).json({ error: 'Аты-жөніңіз бен Email енгізіңіз!' });
@@ -336,7 +351,6 @@ app.post('/api/auth', async (req, res) => {
     }
 });
 
-// Таңдалған орындарға билет сатып алу
 app.post('/api/book-seats', async (req, res) => {
     const { user_id, concert_id, seats } = req.body;
     if (!seats || seats.length === 0) return res.status(400).json({ error: 'Кем дегенде 1 орын таңдаңыз!' });
@@ -345,7 +359,6 @@ app.post('/api/book-seats', async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // Браузерде ескі user_id қалып қойса, базадан тексеріп, жоқ болса автоматты жасау
         let validUserId = user_id;
         const userCheck = await client.query('SELECT id FROM users WHERE id = $1', [user_id]);
         if (userCheck.rows.length === 0) {
@@ -357,7 +370,6 @@ app.post('/api/book-seats', async (req, res) => {
             validUserId = fallbackUser.rows[0].id;
         }
 
-        // Концерт атауын базадан алып, bookings кестесіне қоса жазу
         const concertRes = await client.query('SELECT artist, title, city FROM concerts WHERE id = $1', [concert_id]);
         const cInfo = concertRes.rows[0];
         const concertTitleText = cInfo ? `${cInfo.artist} — ${cInfo.title} (${cInfo.city})` : 'Концерт';
@@ -373,7 +385,6 @@ app.post('/api/book-seats', async (req, res) => {
             createdBookings.push(rows[0]);
         }
 
-        // Бос орындар санын азайту
         await client.query('UPDATE concerts SET available_seats = available_seats - $1 WHERE id = $2', [seats.length, concert_id]);
         await client.query('COMMIT');
         res.json({ success: true, bookings: createdBookings });
@@ -385,7 +396,6 @@ app.post('/api/book-seats', async (req, res) => {
     }
 });
 
-// Пайдаланушының профилі мен сатып алған билеттерін алу
 app.get('/api/profile/:userId', async (req, res) => {
     try {
         const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.userId]);
@@ -409,7 +419,6 @@ app.get('/api/profile/:userId', async (req, res) => {
     }
 });
 
-// Билетті қайтару (броньды өшіру)
 app.delete('/api/bookings/:id', async (req, res) => {
     try {
         const bRes = await pool.query('SELECT * FROM bookings WHERE id = $1', [req.params.id]);
@@ -423,23 +432,13 @@ app.delete('/api/bookings/:id', async (req, res) => {
 });
 
 // =========================================================================
-// 5. АДМИН ПАНЕЛЬ МАРШРУТТАРЫ
+// 6. АДМИН ПАНЕЛЬ МАРШРУТТАРЫ
 // =========================================================================
-
-// Админ құпиясөзін тексеру
-function checkAdmin(req, res, next) {
-    const pass = req.headers['x-admin-password'] || req.body?.password || req.query?.password;
-    if (pass !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Админ құпиясөзі қате!' });
-    next();
-}
-
-// Админ жүйесіне кіру
 app.post('/api/admin/login', (req, res) => {
     if (req.body.password === ADMIN_PASSWORD) res.json({ success: true });
     else res.status(401).json({ error: 'Құпиясөз қате!' });
 });
 
-// Админ бақылау тақтасы (статистика, концерттер, соңғы брондаулар)
 app.get('/api/admin/dashboard', checkAdmin, async (req, res) => {
     try {
         const statsRes = await pool.query('SELECT COALESCE(SUM(total_price), 0) AS total_revenue, COALESCE(SUM(quantity), 0) AS total_sold FROM bookings');
@@ -465,7 +464,6 @@ app.get('/api/admin/dashboard', checkAdmin, async (req, res) => {
     }
 });
 
-// Админ арқылы концерт деректерін толық өңдеу
 app.put('/api/admin/concerts/:id', checkAdmin, async (req, res) => {
     const { title, artist, city, venue, price_balcony, price_fanzone, price_vip, available_seats } = req.body;
     try {
@@ -479,7 +477,6 @@ app.put('/api/admin/concerts/:id', checkAdmin, async (req, res) => {
     }
 });
 
-// Админ арқылы концертті өшіру
 app.delete('/api/admin/concerts/:id', checkAdmin, async (req, res) => {
     try {
         await pool.query('DELETE FROM concerts WHERE id = $1', [req.params.id]);
@@ -489,7 +486,6 @@ app.delete('/api/admin/concerts/:id', checkAdmin, async (req, res) => {
     }
 });
 
-// Билет кодын тексеру және "Қолданылды" (Used) деп белгілеу
 app.post('/api/admin/verify-ticket', checkAdmin, async (req, res) => {
     const { ticket_code, markUsed } = req.body;
     try {
@@ -511,9 +507,6 @@ app.post('/api/admin/verify-ticket', checkAdmin, async (req, res) => {
     }
 });
 
-// =========================================================================
-// 6. СЕРВЕРДІ ІСКЕ ҚОСУ
-// =========================================================================
 initDatabase()
     .then(() => app.listen(PORT, () => console.log(`TicketKZ (Render PostgreSQL) іске қосылды: ${PORT}`)))
     .catch((err) => console.error('База қатесі:', err));
