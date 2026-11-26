@@ -75,6 +75,7 @@ async function initDatabase() {
             ticket_code VARCHAR(30) UNIQUE NOT NULL,
             user_id INT REFERENCES users(id) ON DELETE CASCADE,
             concert_id INT REFERENCES concerts(id) ON DELETE CASCADE,
+            concert_title VARCHAR(255),
             zone_name VARCHAR(50) NOT NULL,
             row_number INT,
             seat_number INT,
@@ -83,6 +84,10 @@ async function initDatabase() {
             status VARCHAR(30) DEFAULT 'Active',
             booking_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+    `);
+
+    await pool.query(`
+        ALTER TABLE bookings ADD COLUMN IF NOT EXISTS concert_title VARCHAR(255);
     `);
 
     await pool.query(`
@@ -265,13 +270,17 @@ app.post('/api/book-seats', async (req, res) => {
             validUserId = fallbackUser.rows[0].id;
         }
 
+        const concertRes = await client.query('SELECT artist, title, city FROM concerts WHERE id = $1', [concert_id]);
+        const cInfo = concertRes.rows[0];
+        const concertTitleText = cInfo ? `${cInfo.artist} — ${cInfo.title} (${cInfo.city})` : 'Концерт';
+
         const createdBookings = [];
         for (const s of seats) {
             const ticket_code = 'TKZ-' + Math.floor(100000 + Math.random() * 900000);
             const { rows } = await client.query(
-                `INSERT INTO bookings (ticket_code, user_id, concert_id, zone_name, row_number, seat_number, quantity, total_price)
-                 VALUES ($1, $2, $3, $4, $5, $6, 1, $7) RETURNING *`,
-                [ticket_code, validUserId, concert_id, s.zone, s.row, s.seat, s.price]
+                `INSERT INTO bookings (ticket_code, user_id, concert_id, concert_title, zone_name, row_number, seat_number, quantity, total_price)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8) RETURNING *`,
+                [ticket_code, validUserId, concert_id, concertTitleText, s.zone, s.row, s.seat, s.price]
             );
             createdBookings.push(rows[0]);
         }
