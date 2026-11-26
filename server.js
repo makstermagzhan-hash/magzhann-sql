@@ -253,13 +253,25 @@ app.post('/api/book-seats', async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+
+        let validUserId = user_id;
+        const userCheck = await client.query('SELECT id FROM users WHERE id = $1', [user_id]);
+        if (userCheck.rows.length === 0) {
+            const fallbackUser = await client.query(
+                `INSERT INTO users (full_name, email, phone, city)
+                 VALUES ('Қонақ сатып алушы', 'guest_' || floor(random()*100000) || '@ticketkz.kz', '+7 (777) 000-00-00', 'Алматы')
+                 RETURNING id`
+            );
+            validUserId = fallbackUser.rows[0].id;
+        }
+
         const createdBookings = [];
         for (const s of seats) {
             const ticket_code = 'TKZ-' + Math.floor(100000 + Math.random() * 900000);
             const { rows } = await client.query(
                 `INSERT INTO bookings (ticket_code, user_id, concert_id, zone_name, row_number, seat_number, quantity, total_price)
                  VALUES ($1, $2, $3, $4, $5, $6, 1, $7) RETURNING *`,
-                [ticket_code, user_id, concert_id, s.zone, s.row, s.seat, s.price]
+                [ticket_code, validUserId, concert_id, s.zone, s.row, s.seat, s.price]
             );
             createdBookings.push(rows[0]);
         }
