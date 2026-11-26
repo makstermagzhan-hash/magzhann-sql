@@ -1,5 +1,6 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const initSqlJs = require('sql.js');
+const fs = require('fs');
 const cors = require('cors');
 const path = require('path');
 
@@ -11,39 +12,41 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Локальді SQLite файлы (парольсіз және сыртқы серверсіз)
 const dbPath = path.join(__dirname, 'ticketkz.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) console.error('SQLite қосылу қатесі:', err.message);
-    else console.log('SQLite дерекқоры сәтті қосылды:', dbPath);
-});
+let db = null;
 
-// Promise негізіндегі ыңғайлы SQLite көмекшілері
-function dbRun(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) reject(err);
-            else resolve({ lastID: this.lastID, changes: this.changes });
-        });
-    });
+function saveDb() {
+    if (!db) return;
+    const data = db.export();
+    fs.writeFileSync(dbPath, Buffer.from(data));
 }
 
-function dbGet(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
-    });
+async function dbRun(sql, params = []) {
+    db.run(sql, params);
+    const res = db.exec('SELECT last_insert_rowid() AS id, changes() AS changes');
+    const lastID = res[0]?.values[0]?.[0] || 0;
+    const changes = res[0]?.values[0]?.[1] || 0;
+    saveDb();
+    return { lastID, changes };
 }
 
-function dbAll(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows);
-        });
-    });
+async function dbGet(sql, params = []) {
+    const stmt = db.prepare(sql);
+    stmt.bind(params);
+    const row = stmt.step() ? stmt.getAsObject() : null;
+    stmt.free();
+    return row;
+}
+
+async function dbAll(sql, params = []) {
+    const stmt = db.prepare(sql);
+    stmt.bind(params);
+    const rows = [];
+    while (stmt.step()) {
+        rows.push(stmt.getAsObject());
+    }
+    stmt.free();
+    return rows;
 }
 
 // Кестелерді құру және 12 қалаға 28 бастапқы концертті автоматты толтыру
@@ -147,7 +150,7 @@ async function initDatabase() {
                 c
             );
         }
-        console.log('12 қалаға 28 концерт SQLite базасына енгізілді.');
+        console.log('12 қалаға 28 концерт sql.js базасына енгізілді.');
     }
 }
 
@@ -582,11 +585,18 @@ app.post('/api/admin/verify-ticket', checkAdmin, async (req, res) => {
     }
 });
 
-// Серверді база дайын болған соң іске қосу
-initDatabase()
-    .then(() => {
+// Серверді sql.js дайын болған соң іске қосу
+initSqlJs()
+    .then(async (SQL) => {
+        if (fs.existsSync(dbPath)) {
+            const fileBuffer = fs.readFileSync(dbPath);
+            db = new SQL.Database(fileBuffer);
+        } else {
+            db = new SQL.Database();
+        }
+        await initDatabase();
         app.listen(PORT, () => {
-            console.log(`TicketKZ (SQLite) іске қосылды: http://localhost:${PORT}`);
+            console.log(`TicketKZ (sql.js) іске қосылды: http://localhost:${PORT}`);
         });
     })
     .catch((err) => {
